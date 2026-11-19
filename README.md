@@ -1,147 +1,89 @@
 # Squire
 
-ユーザーの仕事と、Herdr 上のエージェント・ターミナルの状態を横断して確認する個人用秘書です。
+複数の AI コーディングエージェントと、ユーザー自身の仕事を横断して把握する個人用秘書です。Herdr App の右端に常駐するターミナルから操作できます。
 
-Work Item の登録・進捗・完了はユーザーが決めます。エージェントの `done` 報告やプロセス終了から、仕事を自動で完了させません。ターミナルがない仕事も管理できます。
+仕事は Work Item として管理し、進捗・次のアクション・関連する Herdr ターミナルを記録します。ターミナルがない仕事も、一つの仕事に複数のターミナルが関わる場合も扱えます。
 
-## 現在の機能
+現在はコマンド式の開発版です。自然言語対話、会話履歴からの TODO 抽出、エージェントへの自動指示は未実装です。
 
-- Work Item の登録・一覧・更新・完了・再開
-- 進捗メモと次のアクションの保存
-- 一つの Work Item と複数の Herdr ターミナルの関連付け
-- ローカルと接続済みリモートの状態照会
-- 行入力による対話と、同じ機能を呼ぶ CLI
-- Herdr の専用レイアウトへの右端ターミナル配置
+## セットアップ
 
-自然言語の解釈、候補 Inbox、会話履歴からの抽出、GitHub 同期、他エージェントへの指示は未実装です。
+OCaml 5.4.1、opam、SQLite 開発ライブラリ、pkg-config が必要です。Herdr 連携には Herdr App と `hc`、テストには Python 3 を使います。
 
-## 開発環境
-
-OCaml 5.4.1、Dune 3.24.2、opam、SQLite 開発ライブラリ、pkg-config が必要です。テストには Python 3 を使います。
-
-以下は OCaml 5.4.1 が既に PATH にある環境向けです。このリポジトリ専用の switch を作り、既存 switch の依存は変更しません。
+OCaml 5.4.1 が PATH にある状態で、リポジトリルートから実行してください。依存はリポジトリ専用の opam switch に導入します。
 
 ```sh
 opam switch create . ocaml-system.5.4.1 --no-switch --no-install --yes
 opam install . --deps-only --locked --yes
 opam exec -- dune build @install
-opam exec -- dune runtest
-opam exec -- dune build @fmt
 ```
 
-ロックは `ocaml-system.5.4.1` を含みます。異なるコンパイラ構成や OS 向けの配布は、まだ検証していません。ドキュメント生成用の依存はロック対象外です。
+現在の依存ロックは `ocaml-system.5.4.1` を前提としています。動作確認環境は macOS、Herdr App 0.1.16、hc 0.1.21 です。
 
-日常の実行は `opam exec -- dune exec squire -- ...` を使います。`opam install .` や dotfiles への起動設定の追加は必須ではありません。
+## 基本操作
 
-## 使い方
-
-```sh
-opam exec -- dune exec squire -- add '書類を提出する'
-opam exec -- dune exec squire -- update 1 --status doing --next '提出先を確認する'
-opam exec -- dune exec squire -- list
-opam exec -- dune exec squire -- sessions
-opam exec -- dune exec squire -- link 1 t1b
-opam exec -- dune exec squire -- link 1 spark/t9
-opam exec -- dune exec squire -- status
-opam exec -- dune exec squire -- done 1
-opam exec -- dune exec squire -- reopen 1
-```
-
-`t1b` / `spark/t9` は例です。`sessions` に出た現在のアドレスを指定してください。関連の解除は `show 1` の「関連番号」を使い、`unlink 1 2` のように指定します。
-
-対話形式で使う場合:
+まず対話画面を起動します。Herdr の右端表示を使わず、通常のターミナルでも操作できます。
 
 ```sh
 opam exec -- dune exec squire -- repl
 ```
 
-```text
-squire> add 書類を提出する
-squire> update 1
-項目 (title/status/progress/next): next
-値: 提出先を確認する
-squire> sessions
-squire> link 1 spark/t9
-squire> status
-squire> done 1
-squire> quit
-```
+`squire>` にコマンドを入力します。仕事は `add` で登録するため、登録前の `list` は空です。
 
-`update` の `progress` は進捗メモ、`next` は次のアクションです。空文字でメモを消せます。`quit` / `exit` / EOF で対話を終了します。入力の編集は端末の通常の行入力に従います。複数行エディタや入力補完はありません。
+| コマンド例 | 操作 |
+|---|---|
+| `add 書類を提出する` | 仕事を登録 |
+| `list` | 登録した仕事を一覧表示 |
+| `show 1` | 仕事の詳細と関連を表示 |
+| `update 1` | 状態・進捗メモ・次のアクションを変更 |
+| `done 1` / `reopen 1` | 完了にする / 未着手に戻す |
+| `sessions` | Herdr のターミナルと状態を取得 |
+| `link 1 t1` | 仕事とターミナルを関連付け |
+| `unlink 1 2` | 仕事の関連付けを解除 |
+| `status` | 仕事と関連ターミナルの最新状態を表示 |
+| `help` / `quit` | コマンド一覧 / 対話を終了 |
 
-## 状態の意味
+仕事の ID は `add` で表示された値、ターミナルのアドレスは `sessions` に出た値に置き換えてください。`unlink` の最後の数字は `show` に表示される関連番号です。`update` では項目と値を続けて入力します。
 
-`sessions` / `status` / `link` の実行時だけ、最大5秒で Herdr に問い合わせます。定期監視や通知は行いません。
-
-- **Work Item の状態**: ユーザーが確定した `todo / doing / waiting / done`
-- **端末の状態**: core が返した `live / finished` と `reason`
-- **プログラム報告**: OSC 7501 でプログラム自身が申告した状態。仕事の達成の証明ではありません
-- **未報告**: プログラムが状態を申告していない場合
-- **古い情報**: 取得失敗時の、時刻を付けた前回値。CLI は非ゼロで終了します
-
-`show` に表示する関連の観測は保存済みの値です。最新情報が必要なら `status` を使います。切断・端末消失・識別情報の矛盾が起きても、仕事の状態と関連を自動で変更しません。再関連付けは、新しい状態を確認した `link` によって明示的に行います。
-
-初期版の「関連セッション」は **Herdr ターミナル**を指します。Codex / Claude の会話セッション ID とは対応しません。同じターミナル内で会話を切り替えても、関連は端末に残ります。
-
-## Herdr の右端に配置する
-
-先に変更内容を確認します。このコマンドは Herdr に接続せず、設定や端末を変更しません。
+仕事の操作や状態照会は、CLI からも実行できます。
 
 ```sh
-opam exec -- dune exec squire -- open --preview
+opam exec -- dune exec squire -- add '書類を提出する'
+opam exec -- dune exec squire -- update 1 --status doing --next '提出先を確認する'
+opam exec -- dune exec squire -- list
 ```
 
-適用する場合:
+## Herdr の右端に表示する
+
+Herdr App を開き、複製元のレイアウトを `--base-layout` で指定します。以下は標準レイアウト `main` を使う新規セットアップの例です。
 
 ```sh
-opam exec -- dune exec squire -- open
+opam exec -- dune exec squire -- open --base-layout main --preview
+opam exec -- dune exec squire -- open --base-layout main
 ```
 
-`open` は次の操作を行います。
+`--preview` は変更内容の表示だけを行います。適用すると、元のレイアウトを初回だけ `squire` に複製し、右端に Squire 用ターミナルを配置して切り替えます。標準 Layout・Mod は変更しません。
 
-1. `bottom-tabs` を初回だけ Herdr の `layout.clone` で `squire` に複製し、クリックによる設定も引き継ぐ。
-2. 専用名・ラベル・起動引数を照合した Squire 端末を再利用するか、親なしで新規起動する。
-3. 複製レイアウトの右端に幅440px・幅変更可能な端末列を追加し、`squire` に切り替える。
+次回以降も初回と同じ `--base-layout` を指定してください。既に設定済みの場合は、そのときの複製元の名前を使います。起動中の Squire は再利用し、終了済みなら起動・表示を復元します。
 
-元のレイアウト、標準 Mod、既存端末には変更を加えません。`squire` レイアウトは独立したコピーで、元レイアウトの後日の変更を自動で取り込みません。実ターミナルアドレスを含む生成レイアウトと、起動元を記録するデータは Git 管理しません。
+Space / Tab を切り替えても Squire は固定表示されます。元の表示に戻すときは、Herdr で元のレイアウトを選択してください。レイアウトの切替だけでは Squire は終了しません。
 
-既存の無関係な `squire` レイアウトや、同名の異なるプログラムを検出した場合は上書き・終了せずエラーにします。二重の `open` はプロセス終了で解放される OS ロックで防ぎます。
+Herdr App を閉じても core 上の Squire は継続します。OS 再起動後は手動で `open` を実行してください。
 
-Space / Tab を切り替えても右列はそのままです。別レイアウトへ切り替えた場合は表示されません。クリックして入力フォーカスを移せます。
+## データと状態の扱い
 
-Herdr App を閉じても、core 上の Squire は継続します。Squire 自体を終了すると Herdr は端末ブロックを除去するため、次の `open` で起動・表示を復元します。OS 再起動後も手動で `open` を実行します。`--keep` によるシェルへの置換や、自動起動は使いません。
+- 仕事の状態はユーザーが決める `todo / doing / waiting / done`。プログラムの `done` 報告や端末終了から、自動で仕事を完了させません
+- 状態取得は `sessions` / `status` / `link` の実行時のみ。取得失敗時は、前回値があれば観測時刻と「古い情報」を付けて表示し、CLI は非ゼロで終了します。`show` は保存済みの値を表示します
+- 関連付けの対象は Herdr ターミナルです。Codex / Claude の会話セッションそのものではありません
+- データは `$XDG_DATA_HOME/squire/`、未設定時は `~/.local/share/squire/` に保存します。`--data-dir` で変更できます
+- DB には仕事・関連付け・必要な状態メタデータを保存し、端末画面や会話本文は保存しません。LLM への送信機能はありません。接続済みリモートの状態は Herdr の既存接続を通して取得します
 
-戻す場合:
+## 開発
 
 ```sh
-herdr-app do layout.switch '{"name":"bottom-tabs"}'
+opam exec -- dune build @install
+opam exec -- dune runtest
+opam exec -- dune build @fmt
 ```
 
-レイアウト切替だけでは Squire プロセスを終了しません。終了する場合は Squire 内で `quit` を入力してください。core の停止・再起動は不要です。
-
-`--base-layout` で元レイアウトを指定できます。初回に選んだ元レイアウトと Herdr のホームをデータ側に記録し、異なる設定での再利用は拒否します。テスト用には `--app-home`・`--hc`・`--herdr-app` を指定できます。
-
-## 保存と連携の境界
-
-データは `$XDG_DATA_HOME/squire/squire.sqlite`、未設定時は `~/.local/share/squire/squire.sqlite` に保存します。`--data-dir` で変更できます。ディレクトリは0700、DB は0600です。
-
-保存するのは Work Item、ターミナルとの関連、前回の観測に必要な最小限の情報です。フォルダ・場所ラベル・core ID・ターミナル ID・プログラム名・状態・観測時刻を含みます。生の API 応答、端末タイトル、起動引数、画面、会話本文は DB に保存しません。
-
-観測は `hc connect` の `hello` / `terminal.list` だけを使い、`caller` を付けません。実行エージェントへの送信・割込み・終了や、会話ログの読み取りは実装していません。起動アダプタだけが Squire 自身の `hc run` と Herdr のレイアウト操作を使います。LLM・外部送信機能はありません。ただし、Herdr に追加済みのリモートへは、状態照会のため既存の接続を通してアクセスします。
-
-core API の接続者には同一ユーザーの権限があります。Squire 内の読み取りメソッド制限は、core が強制する認可境界ではありません。
-
-## 構成と検証
-
-- `lib/domain.ml`: Work Item とターミナルの型・関連の解決
-- `lib/store.ml`: SQLite、トランザクション、保存済み観測
-- `lib/application.ml`: 取得失敗・古い値・明示的な関連付け
-- `lib/herdr.ml` / `lib/process.ml`: JSON-RPC と期限付き子プロセス
-- `lib/layout.ml` / `lib/launcher.ml`: 個人レイアウトの変換と起動
-- `lib/ui.ml` / `bin/main.ml`: 行入力の対話と CLI
-
-自動テストは専用一時ディレクトリと偽の hc / App を使い、本番 core を操作しません。状態報告から仕事を自動完了しないこと、保存失敗、再起動後の保持、古い情報の表示、接続先識別、起動の衝突と復帰を確認します。
-
-Herdr App 0.1.16 / core 0.1.21 を連携対象として調査しています。GUI 上の固定配置・日本語 IME・フォーカス・クリックによる幅変更は、自動テストとは別に実機で確認する項目です。
-
-2026-11-17 に同バージョンの実機で、右端表示、Space / Tab 切替中の固定表示、日本語の貼り付け、フォーカス、幅変更、状態照会、起動の再実行による端末再利用、Squire 終了後の表示復元、Herdr App の終了・再表示後の継続を確認しました。元の `bottom-tabs` に追加された `space-theme` とクリック設定も継承しています。日本語 IME の変換操作そのものは未検証です。
+自動テストは一時データと偽の外部連携を使い、本番の Herdr やユーザーデータを変更しません。開発方針は [AGENTS.md](AGENTS.md) を参照してください。
