@@ -8,17 +8,17 @@
 
 ## セットアップ
 
-OCaml 5.4.1、opam、SQLite 開発ライブラリ、pkg-config が必要です。Herdr 連携には Herdr App と `hc`、テストには Python 3 を使います。
+opam、SQLite 開発ライブラリ、pkg-config が必要です。Herdr 連携には Herdr App と `hc`、テストには Python 3 を使います。
 
-OCaml 5.4.1 が PATH にある状態で、リポジトリルートから実行してください。依存はリポジトリ専用の opam switch に導入します。
+リポジトリルートから実行してください。OCaml 5.4.1 と依存はリポジトリ専用の opam switch に導入します。
 
 ```sh
-opam switch create . ocaml-system.5.4.1 --no-switch --no-install --yes
+opam switch create . ocaml-base-compiler.5.4.1 --no-switch --no-install --yes
 opam install . --deps-only --locked --yes
 opam exec -- dune build @install
 ```
 
-現在の依存ロックは `ocaml-system.5.4.1` を前提としています。動作確認環境は macOS、Herdr App 0.1.16、hc 0.1.21 です。
+`ocaml-system.5.4.1` で作成した既存の switch を保持したい場合は、新しい作業コピーで上記を実行してください。Herdr 連携の動作確認環境は macOS、Herdr App 0.1.16、hc 0.1.21 です。
 
 ## 基本操作
 
@@ -87,3 +87,11 @@ opam exec -- dune build @fmt
 ```
 
 自動テストは一時データと偽の外部連携を使い、本番の Herdr やユーザーデータを変更しません。開発方針は [AGENTS.md](AGENTS.md) を参照してください。
+
+PR では Ubuntu 26.04 上で上記の 3 項目と、GitHub Actions の依存ロックを検証します。ワークフローを追加・削除したり、`uses:` を変更したりした場合は、認証済みの GitHub CLI でリポジトリルートから再生成し、ワークフローと `.github/workflows/actions.lock` の差分を確認してください。
+
+```sh
+gh extension install github/gh-actions-lock --pin v0.5.0
+gh actions-lock --no-narrow
+gh actions-lock --verify --no-narrow
+```

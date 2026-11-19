@@ -40,8 +40,10 @@ depends: [
   "menhirSdk" {= "20260209"}
   "num" {= "1.6"}
   "ocaml" {= "5.4.1"}
+  "ocaml-base-compiler" {= "5.4.1"}
+  "ocaml-compiler" {= "5.4.1"}
   "ocaml-config" {= "3"}
-  "ocaml-system" {= "5.4.1"}
+  "ocaml-options-vanilla" {= "1"}
   "ocaml-version" {= "4.1.4"}
   "ocaml_intrinsics_kernel" {= "v0.17.2"}
   "ocamlbuild" {= "0.16.1"}
