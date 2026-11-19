@@ -1,0 +1,8 @@
+(test
+ (name test_squire)
+ (libraries squire unix yojson sqlite3))
+
+(rule
+ (alias runtest)
+ (deps integration.py fake_hc.py fake_app.py)
+ (action (run python3 %{dep:integration.py} %{exe:../bin/main.exe})))

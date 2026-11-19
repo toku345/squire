@@ -1,0 +1,17 @@
+(lang dune 3.24)
+(name squire)
+(generate_opam_files true)
+(maintainers "toku345")
+(authors "toku345")
+(formatting (enabled_for ocaml))
+(package
+ (name squire)
+ (synopsis "A personal work companion for Herdr")
+ (depends
+  (ocaml (= 5.4.1))
+  (dune (= 3.24.2))
+  (cmdliner (>= 2.1.1))
+  (yojson (>= 3.0.0))
+  (lwt (>= 6.1.2))
+  (sqlite3 (>= 5.4.2))
+  (ocamlformat (= 0.29.0))))
